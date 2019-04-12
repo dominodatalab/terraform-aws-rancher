@@ -48,7 +48,7 @@ resource "aws_instance" "this" {
 resource "aws_elb" "this" {
   name            = "${local.lb_name}"
   security_groups = ["${aws_security_group.loadbalancer.id}"]
-  subnets         = ["${var.subnet_ids}"]
+  subnets         = ["${var.lb_subnet_ids}"]
   instances       = ["${aws_instance.this.*.id}"]
   internal        = "${var.internal_lb}"
 
@@ -286,11 +286,16 @@ resource "aws_security_group_rule" "provisioner_secgrp_ingress_443" {
 module "ranchand" {
   source = "./modules/ranchhand"
 
-  # TODO: figure out how to merge public / private ip combos
-  # TODO: promote these values into variables
-  node_ips      = ["${formatlist("%s:%s", aws_instance.this.*.public_ip, aws_instance.this.*.private_ip)}"]
-  ssh_username  = "ubuntu"
-  ssh_key_path  = "~/.ssh/domino-test.pem"
-  cert_dnsnames = ["${aws_elb.this.dns_name}"]
-  distro        = "darwin"
+  node_ips      = ["${split(",", replace(join(",", formatlist("%s:%s", aws_instance.this.*.public_ip, aws_instance.this.*.private_ip)), "/^:|(,):/", "$1"))}"]
+
+  distro           = "${var.ranchhand_distro}"
+  release          = "${var.ranchhand_release}"
+  working_dir      = "${var.ranchhand_working_dir}"
+  cert_dnsnames    = ["${concat(list(aws_elb.this.dns_name), var.cert_dnsnames)}"]
+  cert_ipaddresses = ["${var.cert_ipaddresses}"]
+
+  ssh_username   = "${var.ssh_username}"
+  ssh_key_path   = "${var.ssh_key_path}"
+  ssh_proxy_user = "${var.ssh_proxy_user}"
+  ssh_proxy_host = "${var.ssh_proxy_host}"
 }

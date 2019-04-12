@@ -24,8 +24,6 @@ variable "working_dir" {
   default     = ""
 }
 
-# TODO: change the following two items to a list; comma-delimited string is silly
-# since we can support lists natively
 variable "cert_dnsnames" {
   description = "Hostnames for the rancher and rke ssl certs (comma-delimited)"
   default     = ["domino.rancher"]
@@ -33,7 +31,7 @@ variable "cert_dnsnames" {
 
 variable "cert_ipaddresses" {
   description = "IP addresses for the rancher and rke ssl certs (comma-delimited)"
-  default     = [""]
+  default     = []
 }
 
 variable "ssh_username" {
