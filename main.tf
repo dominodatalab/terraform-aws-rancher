@@ -1,32 +1,37 @@
-# TODO:
-#   - provision rancher servers (can we encapsulate this for reuse?)
-#   - set up security groups
-#     - instances should only accept 443/80 traffic from LB
-#     - lb should attach a provided secgrp
-#   - use prefixes so you can launch multiple w/o ambiguity (maybe)
-
 terraform {
   version = "~> 0.11"
 
-  # (v0.12) https://github.com/hashicorp/terraform/issues/16835
+  # (future v0.12) https://github.com/hashicorp/terraform/issues/16835
   required_providers {
     aws = "~> 2.5"
   }
 }
 
+locals {
+  lb_name                 = "${var.name}-lb-${var.internal_lb ? "int" : "ext"}"
+  lb_secgrp_name          = "${var.name}-lb"
+  instance_secgrp_name    = "${var.name}-instances"
+  provisioner_secgrp_name = "${var.name}-provisioner"
+}
+
+#------------------------------------------------------------------------------
+# EC2 instances
+#------------------------------------------------------------------------------
 resource "aws_instance" "this" {
   count = "${var.instance_count}"
 
   ami                     = "${var.ami}"
-  placement_group         = "${var.placement_group}"
   ebs_optimized           = "${var.ebs_optimized}"
   instance_type           = "${var.instance_type}"
-  key_name                = "${var.key_name}"
+  key_name                = "${var.ssh_key_name}"
   monitoring              = "${var.enable_detailed_monitoring}"
   subnet_id               = "${element(var.subnet_ids, count.index % length(var.subnet_ids))}"
-  vpc_security_group_ids  = ["${var.security_group_ids}"]
-
   disable_api_termination = "${var.enable_deletion_protection}"
+
+  vpc_security_group_ids  = [
+    "${aws_security_group.instances.id}",
+    "${aws_security_group.provisioner.id}"
+  ]
 
   root_block_device {
     volume_size           = "${var.os_disk_size}"
@@ -37,70 +42,255 @@ resource "aws_instance" "this" {
   tags = "${merge(var.tags, map("Name", "${var.name}-${count.index}", "Terraform", "true"))}"
 }
 
-resource "aws_lb" "this" {
-  name               = "${var.name}-lb"
-  internal           = "${var.internal_lb}"
-  load_balancer_type = "network"
-  # security_groups    = [""]
-  subnets            = ["${var.subnet_ids}"]
+#------------------------------------------------------------------------------
+# Load balancer
+#------------------------------------------------------------------------------
+resource "aws_elb" "this" {
+  name            = "${local.lb_name}"
+  security_groups = ["${aws_security_group.loadbalancer.id}"]
+  subnets         = ["${var.subnet_ids}"]
+  instances       = ["${aws_instance.this.*.id}"]
+  internal        = "${var.internal_lb}"
 
-  enable_deletion_protection = "${var.enable_deletion_protection}"
-
-  tags = "${merge(var.tags, map("Name", "${var.name}-lb", "Terraform", "true"))}"
-}
-
-resource "aws_lb_target_group" "443" {
-  name        = "${var.name}-tcp-443"
-  port        = 443
-  protocol    =  "TCP"
-  target_type = "instance"
-  vpc_id      = "${var.vpc_id}"
-
-  health_check {
-    interval            = 10
-    path                = "/healthz"
-    port                = 80
-    protocol            = "HTTP"
-    timeout             = 6
-    healthy_threshold   = 3
-    unhealthy_threshold = 3
-    matcher             = "200-399"
+  listener {
+    instance_port     = 443
+    instance_protocol = "TCP"
+    lb_port           = 443
+    lb_protocol       = "TCP"
   }
 
-  tags = "${merge(var.tags, map("Name", "${var.name}-tcp-443", "Terraform", "true"))}"
-}
-
-resource "aws_lb_target_group" "80" {
-  name        = "${var.name}-tcp-80"
-  port        = 80
-  protocol    =  "TCP"
-  target_type = "instance"
-  vpc_id      = "${var.vpc_id}"
-
-  health_check {
-    interval            = 10
-    path                = "/healthz"
-    port                = "traffic-port"
-    protocol            = "HTTP"
-    timeout             = 6
-    healthy_threshold   = 3
-    unhealthy_threshold = 3
-    matcher             = "200-399"
+  listener {
+    instance_port     = 80
+    instance_protocol = "TCP"
+    lb_port           = 80
+    lb_protocol       = "TCP"
   }
 
-  tags = "${merge(var.tags, map("Name", "${var.name}-tcp-80", "Terraform", "true"))}"
+  health_check {
+    healthy_threshold   = 3
+    unhealthy_threshold = 3
+    target              = "HTTP:80/healthz"
+    interval            = 10
+    timeout             = 6
+  }
+
+  tags = "${merge(var.tags, map("Name", "${local.lb_name}", "Terraform", "true"))}"
 }
 
-resource "aws_lb_target_group_attachment" "443" {
-  count = "${var.instance_count}"
+#------------------------------------------------------------------------------
+# Security groups
+#------------------------------------------------------------------------------
+resource "aws_security_group" "loadbalancer" {
+  name        = "${local.lb_secgrp_name}"
+  description = "Grant access to Rancher ELB"
+  vpc_id      = "${var.vpc_id}"
 
-  target_group_arn = "${aws_lb_target_group.443.arn}"
-  target_id        = "${element(aws_instance.this.*.id, count.index)}"
+  tags = "${merge(var.tags, map("Name", "${local.lb_secgrp_name}", "Terraform", "true"))}"
 }
 
-resource "aws_lb_target_group_attachment" "80" {
-  count = "${var.instance_count}"
+resource "aws_security_group_rule" "lb_cidr_ingress_443" {
+  type        = "ingress"
+  from_port   = 443
+  to_port     = 443
+  protocol    = "tcp"
 
-  target_group_arn = "${aws_lb_target_group.80.arn}"
-  target_id        = "${element(aws_instance.this.*.id, count.index)}"
+  security_group_id = "${aws_security_group.loadbalancer.id}"
+  cidr_blocks       = ["${var.lb_cidr_blocks}"]
+}
+
+resource "aws_security_group_rule" "lb_secgrp_ingress_443" {
+  count = "${length(var.lb_security_groups)}"
+
+  type        = "ingress"
+  from_port   = 443
+  to_port     = 443
+  protocol    = "tcp"
+
+  security_group_id        = "${aws_security_group.loadbalancer.id}"
+  source_security_group_id = "${var.lb_security_groups[count.index]}"
+}
+
+resource "aws_security_group_rule" "lb_cidr_ingress_80" {
+  type        = "ingress"
+  from_port   = 80
+  to_port     = 80
+  protocol    = "tcp"
+
+  security_group_id = "${aws_security_group.loadbalancer.id}"
+  cidr_blocks       = ["${var.lb_cidr_blocks}"]
+}
+
+resource "aws_security_group_rule" "lb_secgrp_ingress_80" {
+  count = "${length(var.lb_security_groups)}"
+
+  type        = "ingress"
+  from_port   = 80
+  to_port     = 80
+  protocol    = "tcp"
+
+  security_group_id        = "${aws_security_group.loadbalancer.id}"
+  source_security_group_id = "${var.lb_security_groups[count.index]}"
+}
+
+resource "aws_security_group_rule" "lb_egress_443" {
+  type        = "egress"
+  description = "Outgoing instance traffic"
+  from_port   = 443
+  to_port     = 443
+  protocol    = "tcp"
+
+  security_group_id        = "${aws_security_group.loadbalancer.id}"
+  source_security_group_id = "${aws_security_group.instances.id}"
+}
+
+resource "aws_security_group_rule" "lb_egress_80" {
+  type        = "egress"
+  description = "Outgoing instance traffic"
+  from_port   = 80
+  to_port     = 80
+  protocol    = "tcp"
+
+  security_group_id        = "${aws_security_group.loadbalancer.id}"
+  source_security_group_id = "${aws_security_group.instances.id}"
+}
+
+resource "aws_security_group" "instances" {
+  name        = "${local.instance_secgrp_name}"
+  description = "Govern access to Rancher server instances"
+  vpc_id      = "${var.vpc_id}"
+
+  ingress {
+    description = "Incoming LB traffic"
+    from_port   = 443
+    to_port     = 443
+    protocol    = "tcp"
+    security_groups = ["${aws_security_group.loadbalancer.id}"]
+  }
+
+  ingress {
+    description = "Incoming LB traffic"
+    from_port   = 80
+    to_port     = 80
+    protocol    = "tcp"
+    security_groups = ["${aws_security_group.loadbalancer.id}"]
+  }
+
+  ingress {
+    description = "Node intercommunication"
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    self        = true
+  }
+
+  egress {
+    description = "Allow all outbound traffic"
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  tags = "${merge(var.tags, map("Name", "${local.instance_secgrp_name}", "Terraform", "true"))}"
+}
+
+resource "aws_security_group" "provisioner" {
+  name        = "${local.provisioner_secgrp_name}"
+  description = "Provision Rancher instances"
+  vpc_id      = "${var.vpc_id}"
+
+  tags = "${merge(var.tags, map("Name", "${local.provisioner_secgrp_name}", "Terraform", "true"))}"
+}
+
+resource "aws_security_group_rule" "provisioner_cidr_ingress_22" {
+  count = "${length(var.provisioner_cidr_block) > 0 ? 1 : 0}"
+
+  type        = "ingress"
+  description = "RKE SSH access"
+  from_port   = 22
+  to_port     = 22
+  protocol    = "tcp"
+
+  security_group_id = "${aws_security_group.provisioner.id}"
+  cidr_blocks       = ["${var.provisioner_cidr_block}"]
+}
+
+resource "aws_security_group_rule" "provisioner_secgrp_ingress_22" {
+  count = "${length(var.provisioner_security_group) > 0 ? 1 : 0}"
+
+  type        = "ingress"
+  description = "RKE SSH access"
+  from_port   = 22
+  to_port     = 22
+  protocol    = "tcp"
+
+  security_group_id        = "${aws_security_group.provisioner.id}"
+  source_security_group_id = "${var.provisioner_security_group}"
+}
+
+resource "aws_security_group_rule" "provisioner_cidr_ingress_6443" {
+  count = "${length(var.provisioner_cidr_block) > 0 ? 1 : 0}"
+
+  type        = "ingress"
+  description = "RKE K8s endpoint verification"
+  from_port   = 6443
+  to_port     = 6443
+  protocol    = "tcp"
+
+  security_group_id = "${aws_security_group.provisioner.id}"
+  cidr_blocks       = ["${var.provisioner_cidr_block}"]
+}
+
+resource "aws_security_group_rule" "provisioner_secgrp_ingress_6443" {
+  count = "${length(var.provisioner_security_group) > 0 ? 1 : 0}"
+
+  type        = "ingress"
+  description = "RKE K8s endpoint verification"
+  from_port   = 6443
+  to_port     = 6443
+  protocol    = "tcp"
+
+  security_group_id        = "${aws_security_group.provisioner.id}"
+  source_security_group_id = "${var.provisioner_security_group}"
+}
+
+resource "aws_security_group_rule" "provisioner_cidr_ingress_443" {
+  count = "${length(var.provisioner_cidr_block) > 0 ? 1 : 0}"
+
+  type        = "ingress"
+  description = "Ranchhand cluster verification"
+  from_port   = 443
+  to_port     = 443
+  protocol    = "tcp"
+
+  security_group_id = "${aws_security_group.provisioner.id}"
+  cidr_blocks       = ["${var.provisioner_cidr_block}"]
+}
+
+resource "aws_security_group_rule" "provisioner_secgrp_ingress_443" {
+  count = "${length(var.provisioner_security_group) > 0 ? 1 : 0}"
+
+  type        = "ingress"
+  description = "Ranchhand cluster verification"
+  from_port   = 443
+  to_port     = 443
+  protocol    = "tcp"
+
+  security_group_id        = "${aws_security_group.provisioner.id}"
+  source_security_group_id = "${var.provisioner_security_group}"
+}
+
+#------------------------------------------------------------------------------
+# Provisioner
+#------------------------------------------------------------------------------
+module "ranchand" {
+  source = "./modules/ranchhand"
+
+  # TODO: figure out how to merge public / private ip combos
+  # TODO: promote these values into variables
+  node_ips      = ["${formatlist("%s:%s", aws_instance.this.*.public_ip, aws_instance.this.*.private_ip)}"]
+  ssh_username  = "ubuntu"
+  ssh_key_path  = "~/.ssh/domino-test.pem"
+  cert_dnsnames = ["${aws_elb.this.dns_name}"]
+  distro        = "darwin"
 }

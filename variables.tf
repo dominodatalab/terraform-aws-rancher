@@ -1,73 +1,92 @@
+#------------------------------------------------------------------------------
+# REQUIRED
+#------------------------------------------------------------------------------
 variable "vpc_id" {
-  description = ""
+  description = "VPC where resources should be created"
 }
 
 variable "subnet_ids" {
-  description = ""
+  description = "List of subnets where LB and instances will be created"
   type = "list"
 }
 
-variable "key_name" {
-  description = ""
+variable "ssh_key_name" {
+  description = "Name of the EC2 key pair to use for the instances"
 }
 
+#------------------------------------------------------------------------------
+# YOU MUST CHOOSE ONE OF THE FOLLOWING OTHERWISE PROVISIONING WILL FAIL!
+#------------------------------------------------------------------------------
+variable "provisioner_security_group" {
+  description = "ID of security group attached to the VM that will provision the Rancher instances. This is typically a bastion host."
+  default     = ""
+}
+
+variable "provisioner_cidr_block" {
+  description = "CIDR address of the host that will provision the Rancher instances. This will only work with instances that are publicly accessible."
+  default     = ""
+}
+
+#------------------------------------------------------------------------------
+# OPTIONAL
+#------------------------------------------------------------------------------
 variable "name" {
-  description = ""
+  description = "Root name applied to all resources"
   default     = "rancher"
 }
 
-variable "instance_count" {
-  description = ""
-  default     = 3
-}
-
 variable "internal_lb" {
-  description = ""
+  description = "Create an internal load balancer. Defaults to internet-facing."
   default     = false
 }
 
+variable "lb_security_groups" {
+  description = "Grant LB ingress access to one or more security group IDs"
+  default     = []
+}
+
+variable "lb_cidr_blocks" {
+  description = "Grant LB ingress access to one or more CIDR addresses"
+  default     = []
+}
+
+variable "instance_count" {
+  description = "Number of instances to launch"
+  default     = 3
+}
+
 variable "ami" {
-  description = ""
+  description = "Instance AMI defaults to Ubuntu 16.04"
   default     = "ami-0565af6e282977273"
 }
 
 variable "instance_type" {
-  description = ""
+  description = "Type of instances to launch"
   default     = "t3.xlarge"
 }
 
-variable "security_group_ids" {
-  description = ""
-  default     = []
-}
-
-variable "placement_group" {
-  description = ""
-  default     = ""
-}
-
 variable "os_disk_size" {
-  description = ""
+  description = "Root partition volume size for instances"
   default     = 30
 }
 
 variable "os_disk_type" {
-  description = ""
+  description = "Root partition volume type for instances"
   default     = "gp2"
 }
 
 variable "os_disk_delete_on_termination" {
-  description = ""
+  description = "Destroy root EBS volume when instances are terminated"
   default     = true
 }
 
 variable "ebs_optimized" {
-  description = ""
+  description = "Attach NICs dedicated to EBS volume network traffic"
   default     = true
 }
 
 variable "enable_detailed_monitoring" {
-  description = ""
+  description = "Launch EC2 instances with detailed monitoring enabled"
   default     = false
 }
 
@@ -77,6 +96,6 @@ variable "enable_deletion_protection" {
 }
 
 variable "tags" {
-  description = ""
+  description = "Extra tags assigned to all resources"
   default     = {}
 }
