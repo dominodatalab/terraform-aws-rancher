@@ -35,7 +35,7 @@ data "template_file" "launcher" {
 
 resource "local_file" "launcher" {
   content  = "${data.template_file.launcher.rendered}"
-  filename = "${local.script}"
+  filename = "${var.working_dir}/${local.script}"
 }
 
 resource "null_resource" "provisioner" {

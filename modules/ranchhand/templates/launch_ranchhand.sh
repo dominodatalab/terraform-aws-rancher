@@ -50,7 +50,6 @@ install_ranchhand() {
     curl -sL $artifact_url | tar xz
 
     echo "installed tool: ranchhand"
-    $ranchhand version
   fi
 }
 
@@ -75,7 +74,7 @@ launch_ranchhand() {
     echo "prepared bastion for run: $ssh_proxy_host"
 
     # override vars to dispatch call onto ssh proxy
-    ranchhand="ssh $ssh_args $ssh_host_str cd $workdir && $bin"
+    ranchhand="ssh $ssh_args $ssh_host_str cd $workdir && $ranchhand"
     ssh_key_path='$(pwd)/ssh_key'
   fi
 

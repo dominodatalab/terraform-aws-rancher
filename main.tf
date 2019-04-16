@@ -89,6 +89,8 @@ resource "aws_security_group" "loadbalancer" {
 }
 
 resource "aws_security_group_rule" "lb_cidr_ingress_443" {
+  count = "${length(var.lb_cidr_blocks)}"
+
   type        = "ingress"
   from_port   = 443
   to_port     = 443
@@ -99,7 +101,7 @@ resource "aws_security_group_rule" "lb_cidr_ingress_443" {
 }
 
 resource "aws_security_group_rule" "lb_secgrp_ingress_443" {
-  count = "${length(var.lb_security_groups)}"
+  count = "${var.lb_security_groups_count}"
 
   type        = "ingress"
   from_port   = 443
@@ -111,6 +113,8 @@ resource "aws_security_group_rule" "lb_secgrp_ingress_443" {
 }
 
 resource "aws_security_group_rule" "lb_cidr_ingress_80" {
+  count = "${length(var.lb_cidr_blocks)}"
+
   type        = "ingress"
   from_port   = 80
   to_port     = 80
@@ -121,7 +125,7 @@ resource "aws_security_group_rule" "lb_cidr_ingress_80" {
 }
 
 resource "aws_security_group_rule" "lb_secgrp_ingress_80" {
-  count = "${length(var.lb_security_groups)}"
+  count = "${var.lb_security_groups_count}"
 
   type        = "ingress"
   from_port   = 80
@@ -203,7 +207,7 @@ resource "aws_security_group" "provisioner" {
 }
 
 resource "aws_security_group_rule" "provisioner_cidr_ingress_22" {
-  count = "${length(var.provisioner_cidr_block) > 0 ? 1 : 0}"
+  count = "${var.use_provisioner_secgrp ? 0 : 1}"
 
   type        = "ingress"
   description = "RKE SSH access"
@@ -216,7 +220,7 @@ resource "aws_security_group_rule" "provisioner_cidr_ingress_22" {
 }
 
 resource "aws_security_group_rule" "provisioner_secgrp_ingress_22" {
-  count = "${length(var.provisioner_security_group) > 0 ? 1 : 0}"
+  count = "${var.use_provisioner_secgrp ? 1 : 0}"
 
   type        = "ingress"
   description = "RKE SSH access"
@@ -229,7 +233,7 @@ resource "aws_security_group_rule" "provisioner_secgrp_ingress_22" {
 }
 
 resource "aws_security_group_rule" "provisioner_cidr_ingress_6443" {
-  count = "${length(var.provisioner_cidr_block) > 0 ? 1 : 0}"
+  count = "${var.use_provisioner_secgrp ? 0 : 1}"
 
   type        = "ingress"
   description = "RKE K8s endpoint verification"
@@ -242,7 +246,7 @@ resource "aws_security_group_rule" "provisioner_cidr_ingress_6443" {
 }
 
 resource "aws_security_group_rule" "provisioner_secgrp_ingress_6443" {
-  count = "${length(var.provisioner_security_group) > 0 ? 1 : 0}"
+  count = "${var.use_provisioner_secgrp ? 1 : 0}"
 
   type        = "ingress"
   description = "RKE K8s endpoint verification"
@@ -255,7 +259,7 @@ resource "aws_security_group_rule" "provisioner_secgrp_ingress_6443" {
 }
 
 resource "aws_security_group_rule" "provisioner_cidr_ingress_443" {
-  count = "${length(var.provisioner_cidr_block) > 0 ? 1 : 0}"
+  count = "${var.use_provisioner_secgrp ? 0 : 1}"
 
   type        = "ingress"
   description = "Ranchhand cluster verification"
@@ -268,7 +272,7 @@ resource "aws_security_group_rule" "provisioner_cidr_ingress_443" {
 }
 
 resource "aws_security_group_rule" "provisioner_secgrp_ingress_443" {
-  count = "${length(var.provisioner_security_group) > 0 ? 1 : 0}"
+  count = "${var.use_provisioner_secgrp ? 1 : 0}"
 
   type        = "ingress"
   description = "Ranchhand cluster verification"
@@ -283,7 +287,7 @@ resource "aws_security_group_rule" "provisioner_secgrp_ingress_443" {
 #------------------------------------------------------------------------------
 # Provisioner
 #------------------------------------------------------------------------------
-module "ranchand" {
+module "ranchhand" {
   source = "./modules/ranchhand"
 
   node_ips      = ["${split(",", replace(join(",", formatlist("%s:%s", aws_instance.this.*.public_ip, aws_instance.this.*.private_ip)), "/^:|(,):/", "$1"))}"]
