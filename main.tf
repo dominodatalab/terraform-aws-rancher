@@ -28,9 +28,9 @@ resource "aws_instance" "this" {
   subnet_id               = "${element(var.subnet_ids, count.index % length(var.subnet_ids))}"
   disable_api_termination = "${var.enable_deletion_protection}"
 
-  vpc_security_group_ids  = [
+  vpc_security_group_ids = [
     "${aws_security_group.instances.id}",
-    "${aws_security_group.provisioner.id}"
+    "${aws_security_group.provisioner.id}",
   ]
 
   root_block_device {
@@ -92,10 +92,10 @@ resource "aws_security_group" "loadbalancer" {
 resource "aws_security_group_rule" "lb_cidr_ingress_443" {
   count = "${length(var.lb_cidr_blocks)}"
 
-  type        = "ingress"
-  from_port   = 443
-  to_port     = 443
-  protocol    = "tcp"
+  type      = "ingress"
+  from_port = 443
+  to_port   = 443
+  protocol  = "tcp"
 
   security_group_id = "${aws_security_group.loadbalancer.id}"
   cidr_blocks       = ["${var.lb_cidr_blocks}"]
@@ -104,10 +104,10 @@ resource "aws_security_group_rule" "lb_cidr_ingress_443" {
 resource "aws_security_group_rule" "lb_secgrp_ingress_443" {
   count = "${var.lb_security_groups_count}"
 
-  type        = "ingress"
-  from_port   = 443
-  to_port     = 443
-  protocol    = "tcp"
+  type      = "ingress"
+  from_port = 443
+  to_port   = 443
+  protocol  = "tcp"
 
   security_group_id        = "${aws_security_group.loadbalancer.id}"
   source_security_group_id = "${var.lb_security_groups[count.index]}"
@@ -116,10 +116,10 @@ resource "aws_security_group_rule" "lb_secgrp_ingress_443" {
 resource "aws_security_group_rule" "lb_cidr_ingress_80" {
   count = "${length(var.lb_cidr_blocks)}"
 
-  type        = "ingress"
-  from_port   = 80
-  to_port     = 80
-  protocol    = "tcp"
+  type      = "ingress"
+  from_port = 80
+  to_port   = 80
+  protocol  = "tcp"
 
   security_group_id = "${aws_security_group.loadbalancer.id}"
   cidr_blocks       = ["${var.lb_cidr_blocks}"]
@@ -128,10 +128,10 @@ resource "aws_security_group_rule" "lb_cidr_ingress_80" {
 resource "aws_security_group_rule" "lb_secgrp_ingress_80" {
   count = "${var.lb_security_groups_count}"
 
-  type        = "ingress"
-  from_port   = 80
-  to_port     = 80
-  protocol    = "tcp"
+  type      = "ingress"
+  from_port = 80
+  to_port   = 80
+  protocol  = "tcp"
 
   security_group_id        = "${aws_security_group.loadbalancer.id}"
   source_security_group_id = "${var.lb_security_groups[count.index]}"
@@ -165,18 +165,18 @@ resource "aws_security_group" "instances" {
   vpc_id      = "${var.vpc_id}"
 
   ingress {
-    description = "Incoming LB traffic"
-    from_port   = 443
-    to_port     = 443
-    protocol    = "tcp"
+    description     = "Incoming LB traffic"
+    from_port       = 443
+    to_port         = 443
+    protocol        = "tcp"
     security_groups = ["${aws_security_group.loadbalancer.id}"]
   }
 
   ingress {
-    description = "Incoming LB traffic"
-    from_port   = 80
-    to_port     = 80
-    protocol    = "tcp"
+    description     = "Incoming LB traffic"
+    from_port       = 80
+    to_port         = 80
+    protocol        = "tcp"
     security_groups = ["${aws_security_group.loadbalancer.id}"]
   }
 
@@ -291,7 +291,7 @@ resource "aws_security_group_rule" "provisioner_secgrp_ingress_443" {
 module "ranchhand" {
   source = "./modules/ranchhand"
 
-  node_ips      = ["${split(",", replace(join(",", formatlist("%s:%s", aws_instance.this.*.public_ip, aws_instance.this.*.private_ip)), "/^:|(,):/", "$1"))}"]
+  node_ips = ["${split(",", replace(join(",", formatlist("%s:%s", aws_instance.this.*.public_ip, aws_instance.this.*.private_ip)), "/^:|(,):/", "$1"))}"]
 
   distro           = "${var.ranchhand_distro}"
   release          = "${var.ranchhand_release}"
