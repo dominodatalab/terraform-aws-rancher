@@ -51,6 +51,7 @@ resource "aws_elb" "this" {
   subnets         = ["${var.lb_subnet_ids}"]
   instances       = ["${aws_instance.this.*.id}"]
   internal        = "${var.internal_lb}"
+  idle_timeout    = 3600
 
   listener {
     instance_port     = 443
