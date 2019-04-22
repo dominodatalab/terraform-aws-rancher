@@ -23,10 +23,9 @@ variable "ssh_key_name" {
 # YOU MUST CHOOSE ONE OF THE FOLLOWING OTHERWISE PROVISIONING WILL FAIL!
 #------------------------------------------------------------------------------
 variable "use_provisioner_secgrp" {
-  description = "Blah"
+  description = "Determines whether to use the security provision_security_group or provisioner_cidr_block inputs."
   default     = "true"
 }
-
 
 variable "provisioner_security_group" {
   description = "ID of security group attached to the VM that will provision the Rancher instances. This is typically a bastion host."
@@ -57,7 +56,7 @@ variable "lb_security_groups" {
 }
 
 variable "lb_security_groups_count" {
-  description = "Blah Grant LB ingress access to one or more security group IDs"
+  description = "Count of dynamically determines lb_security_groups"
   default     = 0
 }
 

@@ -4,6 +4,6 @@ output "lb_dns_name" {
 }
 
 output "cluster_provisioned" {
-  description = "Blah blah"
+  description = "ID of the null_resource cluster provisioner"
   value       = "${module.ranchhand.cluster_provisioned}"
 }
