@@ -22,6 +22,11 @@ variable "ssh_key_name" {
 #------------------------------------------------------------------------------
 # YOU MUST CHOOSE ONE OF THE FOLLOWING OTHERWISE PROVISIONING WILL FAIL!
 #------------------------------------------------------------------------------
+variable "use_provisioner_secgrp" {
+  description = "Determines whether to use the security provision_security_group or provisioner_cidr_block inputs."
+  default     = "true"
+}
+
 variable "provisioner_security_group" {
   description = "ID of security group attached to the VM that will provision the Rancher instances. This is typically a bastion host."
   default     = ""
@@ -48,6 +53,11 @@ variable "internal_lb" {
 variable "lb_security_groups" {
   description = "Grant LB ingress access to one or more security group IDs"
   default     = []
+}
+
+variable "lb_security_groups_count" {
+  description = "Count of dynamically determines lb_security_groups"
+  default     = 0
 }
 
 variable "lb_cidr_blocks" {
@@ -125,12 +135,12 @@ variable "ranchhand_working_dir" {
 
 variable "cert_dnsnames" {
   description = "Hostnames for the rancher and rke ssl certs (comma-delimited)"
-  default     = ["domino.rancher"]
+  default     = [""]
 }
 
 variable "cert_ipaddresses" {
   description = "IP addresses for the rancher and rke ssl certs (comma-delimited)"
-  default     = []
+  default     = ["127.0.0.1"]
 }
 
 variable "ssh_username" {
