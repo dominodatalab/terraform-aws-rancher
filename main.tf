@@ -33,6 +33,10 @@ resource "aws_instance" "this" {
     "${aws_security_group.provisioner.id}",
   ]
 
+  lifecycle {
+    ignore_changes = ["ami"]
+  }
+
   root_block_device {
     volume_size           = "${var.os_disk_size}"
     volume_type           = "${var.os_disk_type}"
@@ -87,6 +91,26 @@ resource "aws_security_group" "loadbalancer" {
   vpc_id      = "${var.vpc_id}"
 
   tags = "${merge(var.tags, map("Name", "${local.lb_secgrp_name}", "Terraform", "true"))}"
+}
+
+resource "aws_security_group_rule" "lb_rancher_ingress_443" {
+  type      = "ingress"
+  from_port = 443
+  to_port   = 443
+  protocol  = "tcp"
+
+  security_group_id        = "${aws_security_group.loadbalancer.id}"
+  source_security_group_id = "${aws_security_group.instances.id}"
+}
+
+resource "aws_security_group_rule" "lb_rancher_ingress_80" {
+  type      = "ingress"
+  from_port = 80
+  to_port   = 80
+  protocol  = "tcp"
+
+  security_group_id        = "${aws_security_group.loadbalancer.id}"
+  source_security_group_id = "${aws_security_group.instances.id}"
 }
 
 resource "aws_security_group_rule" "lb_cidr_ingress_443" {
