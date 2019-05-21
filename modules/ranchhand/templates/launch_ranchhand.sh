@@ -29,6 +29,7 @@ install_jq() {
       urlfrag="osx-amd"
     fi
     curl -sLo /usr/local/bin/jq "https://github.com/stedolan/jq/releases/download/jq-1.6/jq-$${urlfrag}64"
+    chmod +x /usr/local/bin/jq
 
     echo "installed tool: jq"
   fi
