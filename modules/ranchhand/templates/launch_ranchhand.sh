@@ -26,9 +26,10 @@ install_jq() {
     local urlfrag="linux"
 
     if [[ $distro == "darwin" ]]; then
-      urlfrag="osx-"
+      urlfrag="osx"
     fi
-    curl -sLo /usr/local/bin/jq "https://github.com/stedolan/jq/releases/download/jq-1.6/jq-$${urlfrag}-amd64"
+    curl -sLo /usr/local/bin/jq "https://github.com/stedolan/jq/releases/download/jq-1.6/jq-$urlfrag-amd64"
+    chmod +x /usr/local/bin/jq
 
     echo "installed tool: jq"
   fi
