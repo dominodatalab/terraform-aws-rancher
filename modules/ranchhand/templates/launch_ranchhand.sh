@@ -23,12 +23,17 @@ ensure_workdir() {
 
 install_jq() {
   if ! command -v jq &> /dev/null; then
-    local urlfrag="linux"
 
-    if [[ $distro == "darwin" ]]; then
+    if [[ $distro == "darwin" ]]
+    then
       urlfrag="osx"
+      curl -sLo /usr/local/bin/jq "https://github.com/stedolan/jq/releases/download/jq-1.6/jq-$urlfrag-amd64"
+    elif [[ $distro == "linux" ]]
+    then
+      urlfrag="linux64"
+      curl -sLo /usr/local/bin/jq "https://github.com/stedolan/jq/releases/download/jq-1.6/jq-$urlfrag"
     fi
-    curl -sLo /usr/local/bin/jq "https://github.com/stedolan/jq/releases/download/jq-1.6/jq-$urlfrag-amd64"
+
     chmod +x /usr/local/bin/jq
 
     echo "installed tool: jq"
