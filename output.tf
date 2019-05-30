@@ -7,3 +7,8 @@ output "cluster_provisioned" {
   description = "ID of the null_resource cluster provisioner"
   value       = "${module.ranchhand.cluster_provisioned}"
 }
+
+output "admin_password" {
+  description = "Generated Rancher admin user password"
+  value       = "${module.ranchhand.admin_password}"
+}
