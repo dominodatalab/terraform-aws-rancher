@@ -1,7 +1,3 @@
-provider "template" {
-  version = "~> 2.1"
-}
-
 provider "local" {
   version = "~> 1.2"
 }
@@ -10,15 +6,29 @@ provider "null" {
   version = "~> 2.1"
 }
 
+provider "random" {
+  version = "~> 2.1"
+}
+
+provider "template" {
+  version = "~> 2.1"
+}
+
 locals {
   script       = "launch_ranchhand.sh"
   ip_addresses = "${join(",", var.node_ips)}"
+}
+
+resource "random_string" "password" {
+  length = 20
 }
 
 data "template_file" "launcher" {
   template = "${file("${path.module}/templates/${local.script}")}"
 
   vars {
+    admin_password = "${random_string.password.result}"
+
     distro   = "${var.distro}"
     release  = "${var.release}"
     node_ips = "${local.ip_addresses}"
@@ -35,7 +45,7 @@ data "template_file" "launcher" {
 
 resource "local_file" "launcher" {
   content  = "${data.template_file.launcher.rendered}"
-  filename = "${var.working_dir}/${local.script}"
+  filename = "${var.working_dir == "" ? local.script : "${var.working_dir}/${local.script}"}"
 }
 
 resource "null_resource" "provisioner" {

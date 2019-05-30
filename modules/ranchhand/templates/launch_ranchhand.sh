@@ -85,7 +85,8 @@ launch_ranchhand() {
     --cert-ips "${cert_ips}" \
     --cert-dns-names "${cert_dns_names}" \
     --ssh-user "${ssh_user}" \
-    --ssh-key-path $ssh_key_path
+    --ssh-key-path $ssh_key_path \
+    --admin-password "${admin_password}"
 
   # post-run cleanup and file sync from proxy
   if [[ -n $ssh_proxy_host ]]; then
