@@ -27,8 +27,6 @@ data "template_file" "launcher" {
   template = "${file("${path.module}/templates/${local.script}")}"
 
   vars {
-    admin_password = "${random_string.password.result}"
-
     distro   = "${var.distro}"
     release  = "${var.release}"
     node_ips = "${local.ip_addresses}"
@@ -57,5 +55,10 @@ resource "null_resource" "provisioner" {
     command     = "${data.template_file.launcher.rendered}"
     interpreter = ["/bin/bash", "-c"]
     working_dir = "${var.working_dir}"
+
+    environment = {
+      RANCHER_PASSWORD = "${random_string.password.result}"
+
+    }
   }
 }
