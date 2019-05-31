@@ -10,6 +10,7 @@ set -e
 
 ranchhand="./ranchhand"
 workdir="rancher-provision"
+password="$RANCHER_PASSWORD"
 
 ensure_workdir() {
   if [[ ! -d $workdir ]]; then
@@ -77,6 +78,7 @@ launch_ranchhand() {
     # override vars to dispatch call onto ssh proxy
     ranchhand="ssh $ssh_args $ssh_host_str cd $workdir && $ranchhand"
     ssh_key_path='$(pwd)/ssh_key'
+    password="'$password'"
   fi
 
   echo "launching ranchhand"
@@ -86,7 +88,7 @@ launch_ranchhand() {
     --cert-dns-names "${cert_dns_names}" \
     --ssh-user "${ssh_user}" \
     --ssh-key-path $ssh_key_path \
-    --admin-password $RANCHER_PASSWORD
+    --admin-password $password
 
   # post-run cleanup and file sync from proxy
   if [[ -n $ssh_proxy_host ]]; then
