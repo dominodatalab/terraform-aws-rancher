@@ -58,7 +58,6 @@ resource "null_resource" "provisioner" {
 
     environment = {
       RANCHER_PASSWORD = "${random_string.password.result}"
-
     }
   }
 }
