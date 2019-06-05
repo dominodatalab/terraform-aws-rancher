@@ -57,7 +57,7 @@ resource "null_resource" "provisioner" {
     working_dir = "${var.working_dir}"
 
     environment = {
-      RANCHER_PASSWORD = "${random_string.password.result}"
+      RANCHER_PASSWORD = "${var.admin_password == "" ? random_string.password.result : var.admin_password}"
     }
   }
 }

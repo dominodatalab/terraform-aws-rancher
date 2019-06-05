@@ -327,4 +327,6 @@ module "ranchhand" {
   ssh_key_path   = "${var.ssh_key_path}"
   ssh_proxy_user = "${var.ssh_proxy_user}"
   ssh_proxy_host = "${var.ssh_proxy_host}"
+
+  admin_password = "${var.admin_password}"
 }
