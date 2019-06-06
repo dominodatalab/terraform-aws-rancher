@@ -10,5 +10,5 @@ output "cluster_provisioned" {
 
 output "admin_password" {
   description = "Generated Rancher admin user password"
-  value       = "${var.admin_password == "" ? module.ranchhand.admin_password : var.admin_password}"
+  value       = "${var.admin_password == "" ? join("", random_string.password.*.result) : var.admin_password}"
 }
