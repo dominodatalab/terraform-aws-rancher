@@ -20,6 +20,7 @@ locals {
 }
 
 resource "random_string" "password" {
+  count = "${var.admin_password == "" ? 1 : 0}"
   length = 20
 }
 
@@ -57,7 +58,7 @@ resource "null_resource" "provisioner" {
     working_dir = "${var.working_dir}"
 
     environment = {
-      RANCHER_PASSWORD = "${random_string.password.result}"
+      RANCHER_PASSWORD = "${var.admin_password == "" ? join("", random_string.password.*.result) : var.admin_password}"
     }
   }
 }

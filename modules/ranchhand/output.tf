@@ -3,6 +3,6 @@ output "cluster_provisioned" {
 }
 
 output "admin_password" {
-  description = "Generated password for Rancher default admin user"
-  value       = "${random_string.password.result}"
+  description = "Generated Rancher admin user password"
+  value       = "${var.admin_password == "" ? join("", random_string.password.*.result) : var.admin_password}"
 }

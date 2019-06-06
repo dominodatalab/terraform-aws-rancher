@@ -162,3 +162,8 @@ variable "ssh_proxy_host" {
   description = "Bastion host used to proxy SSH connections"
   default     = ""
 }
+
+variable "admin_password" {
+  description = "Password override for the initial admin user"
+  default     = ""
+}
