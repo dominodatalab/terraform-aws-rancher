@@ -57,23 +57,3 @@ module "rancher" {
   provisioner_security_group = "my-bastion-secgrp-id"
 }
 ```
-
-## Leverage the nested Ranchhand module directly
-
-```hcl
-module "ranchhand" {
-  source   = "git@github.com:cerebrotech/terraform-aws-rancher//modules/ranchhand"
-
-  node_ips         = ["..."]
-  distro           = "darwin"
-  release          = "latest"
-  working_dir      = "..."
-  cert_dnsnames    = ["..."]
-  cert_ipaddresses = ["..."]
-
-  ssh_username   = "..."
-  ssh_key_path   = "..."
-  ssh_proxy_user = "..."
-  ssh_proxy_host = "..."
-}
-```
