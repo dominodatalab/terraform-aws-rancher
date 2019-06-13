@@ -1,11 +1,14 @@
 # terraform-aws-rancher
-Terraform module which creates an HA deployment of Rancher inside AWS
 
-## Create a Rancher cluster with public LB and instances
+Terraform module which creates an HA deployment of Rancher inside AWS using [RanchHand](https://github.com/dominodatalab/ranchhand).
+
+## Usage
+
+### Create a Rancher cluster with public LB and instances
 
 ```hcl
 module "rancher" {
-  source   = "git@github.com:cerebrotech/terraform-aws-rancher"
+  source   = "github.com/cerebrotech/terraform-aws-rancher"
 
   vpc_id         = "vpc-id"
   lb_cidr_blocks = ["0.0.0.0/0"]
@@ -17,11 +20,11 @@ module "rancher" {
 }
 ```
 
-## Provision private instances through a bastion host
+### Provision private instances through a bastion host
 
 ```hcl
 module "rancher" {
-  source   = "git@github.com:cerebrotech/terraform-aws-rancher"
+  source   = "github.com/cerebrotech/terraform-aws-rancher"
 
   vpc_id         = "vpc-id"
   lb_cidr_blocks = ["0.0.0.0/0"]
@@ -37,11 +40,11 @@ module "rancher" {
 }
 ```
 
-## Create an internal LB
+### Create an internal LB
 
 ```hcl
 module "rancher" {
-  source   = "git@github.com:cerebrotech/terraform-aws-rancher"
+  source   = "github.com/cerebrotech/terraform-aws-rancher"
 
   vpc_id             = "vpc-id"
   internal_lb        = true
@@ -57,3 +60,6 @@ module "rancher" {
   provisioner_security_group = "my-bastion-secgrp-id"
 }
 ```
+
+## Development
+Please submit any feature enhancements, bug fixes, or ideas via pull requests or issues. 
