@@ -1,5 +1,5 @@
 terraform {
-  version = "~> 0.11"
+  required_version = "~> 0.11"
 
   # (future v0.12) https://github.com/hashicorp/terraform/issues/16835
   required_providers {
