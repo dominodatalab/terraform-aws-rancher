@@ -7,12 +7,12 @@ variable "vpc_id" {
 
 variable "lb_subnet_ids" {
   description = "List of subnets where LB will be created"
-  type        = "list"
+  type        = list(string)
 }
 
 variable "subnet_ids" {
   description = "List of subnets where instances will be created"
-  type        = "list"
+  type        = list(string)
 }
 
 variable "ssh_key_name" {
@@ -167,3 +167,4 @@ variable "admin_password" {
   description = "Password override for the initial admin user"
   default     = ""
 }
+
