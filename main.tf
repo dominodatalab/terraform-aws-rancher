@@ -343,7 +343,7 @@ resource "aws_security_group_rule" "provisioner_secgrp_ingress_443" {
 # Provisioner
 #------------------------------------------------------------------------------
 module "ranchhand" {
-  source = "github.com/dominodatalab/ranchhand/tree/master/terraform?ref=DOM-14267"
+  source = "github.com/dominodatalab/ranchhand?ref=DOM-14267/terraform"
 
   node_ips = split(
     ",",
