@@ -1,12 +1,3 @@
-terraform {
-  required_version = "~> 0.11"
-
-  # (future v0.12) https://github.com/hashicorp/terraform/issues/16835
-  required_providers {
-    aws = "~> 2.5"
-  }
-}
-
 locals {
   lb_name                 = "${var.name}-lb-${var.internal_lb ? "int" : "ext"}"
   lb_secgrp_name          = "${var.name}-lb"
