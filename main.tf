@@ -46,6 +46,8 @@ resource "aws_instance" "this" {
     inline = ["echo 'sshd is running'"]
 
     connection {
+      host         = coalesce(self.public_ip, self.private_ip)
+      type         = "ssh"
       user         = var.ssh_username
       private_key  = file(var.ssh_key_path)
       bastion_host = var.ssh_proxy_host
