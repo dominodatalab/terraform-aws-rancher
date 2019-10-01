@@ -349,21 +349,12 @@ resource "aws_security_group_rule" "provisioner_secgrp_ingress_443" {
 module "ranchhand" {
   source = "github.com/dominodatalab/ranchhand.git//terraform?ref=v0.1.2-rc1"
 
-  node_ips = split(
-    ",",
-    replace(
-      join(
-        ",",
-        formatlist(
-          "%s:%s",
+  // If for some bizarre reason you mix public/private hosts, this won't work
+  node_ips = formatlist(
+          (aws_instance.this[0].public_ip != "" ? "%s:%s" : "%[2]s"),
           aws_instance.this.*.public_ip,
           aws_instance.this.*.private_ip,
-        ),
-      ),
-      "/^:|(,):/",
-      "$1",
-    ),
-  )
+        )
 
   distro           = var.ranchhand_distro
   release          = var.ranchhand_release
