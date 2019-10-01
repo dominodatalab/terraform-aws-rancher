@@ -41,6 +41,17 @@ resource "aws_instance" "this" {
       "Terraform" = "true"
     },
   )
+
+  provisioner "remote-exec" {
+    inline = "echo 'sshd is running'"
+
+    connection {
+      user         = var.ssh_username
+      private_key  = file(var.ssh_key_path)
+      bastion_host = var.ssh_proxy_host
+      bastion_user = var.ssh_proxy_user
+    }
+  }
 }
 
 #------------------------------------------------------------------------------
