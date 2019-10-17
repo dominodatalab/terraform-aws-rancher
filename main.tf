@@ -347,7 +347,7 @@ resource "aws_security_group_rule" "provisioner_secgrp_ingress_443" {
 # Provisioner
 #------------------------------------------------------------------------------
 module "ranchhand" {
-  source = "github.com/dominodatalab/ranchhand.git//terraform?ref=v0.1.2-rc1"
+  source = "github.com/dominodatalab/ranchhand?ref=v0.1.3-rc1"
 
   // If for some bizarre reason you mix public/private hosts, this won't work
   node_ips = formatlist(
