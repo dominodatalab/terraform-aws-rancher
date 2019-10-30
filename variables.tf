@@ -125,7 +125,7 @@ variable "ranchhand_distro" {
 
 variable "ranchhand_release" {
   description = "Specify the RanchHand release version to use. Check https://github.com/dominodatalab/ranchhand/releases for a list of available releases."
-  default     = "v0.1.0-rc19"
+  default     = "v0.1.0-rc20"
 }
 
 variable "ranchhand_working_dir" {

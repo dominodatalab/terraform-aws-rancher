@@ -313,7 +313,7 @@ resource "aws_security_group_rule" "provisioner_secgrp_ingress_443" {
 # Provisioner
 #------------------------------------------------------------------------------
 module "ranchhand" {
-  source = "github.com/dominodatalab/ranchhand.git//terraform?ref=v0.1.0-rc19"
+  source = "github.com/dominodatalab/ranchhand.git//terraform?ref=v0.1.0-rc20"
 
   node_ips = ["${split(",", replace(join(",", formatlist("%s:%s", aws_instance.this.*.public_ip, aws_instance.this.*.private_ip)), "/^:|(,):/", "$1"))}"]
 
