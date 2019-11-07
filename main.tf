@@ -347,7 +347,7 @@ resource "aws_security_group_rule" "provisioner_secgrp_ingress_443" {
 # Provisioner
 #------------------------------------------------------------------------------
 module "ranchhand" {
-  source = "github.com/dominodatalab/ranchhand?ref=v0.2.0-rc3"
+  source = "github.com/dominodatalab/ranchhand?ref=v0.3.0"
 
   // If for some bizarre reason you mix public/private hosts, this won't work
   node_ips = formatlist(
@@ -356,8 +356,6 @@ module "ranchhand" {
           aws_instance.this.*.private_ip,
         )
 
-  distro           = var.ranchhand_distro
-  release          = var.ranchhand_release
   working_dir      = var.ranchhand_working_dir
   cert_dnsnames    = concat([aws_elb.this.dns_name], var.cert_dnsnames)
   cert_ipaddresses = var.cert_ipaddresses
