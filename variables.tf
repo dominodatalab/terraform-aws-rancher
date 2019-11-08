@@ -118,16 +118,6 @@ variable "tags" {
 #------------------------------------------------------------------------------
 # RANCHHAND
 #------------------------------------------------------------------------------
-variable "ranchhand_distro" {
-  description = "Specify linux or darwin. Platform where RanchHand binary will be executed."
-  default     = "linux"
-}
-
-variable "ranchhand_release" {
-  description = "Specify the RanchHand release version to use. Check https://github.com/dominodatalab/ranchhand/releases for a list of available releases."
-  default     = "v0.1.2-rc1"
-}
-
 variable "ranchhand_working_dir" {
   description = "Directory where ranchhand should be executed. Defaults to the current working directory."
   default     = ""
@@ -167,4 +157,3 @@ variable "admin_password" {
   description = "Password override for the initial admin user"
   default     = ""
 }
-
