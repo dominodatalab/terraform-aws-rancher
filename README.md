@@ -6,6 +6,8 @@ Terraform module which creates an HA deployment of Rancher inside AWS using [Ran
 
 ### Create a Rancher cluster with public LB and instances
 
+_Note:_ public IP support is currently unsupported and deprecated.
+
 ```hcl
 module "rancher" {
   source   = "github.com/cerebrotech/terraform-aws-rancher"
@@ -62,4 +64,4 @@ module "rancher" {
 ```
 
 ## Development
-Please submit any feature enhancements, bug fixes, or ideas via pull requests or issues. 
+Please submit any feature enhancements, bug fixes, or ideas via pull requests or issues.
