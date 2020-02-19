@@ -157,3 +157,8 @@ variable "admin_password" {
   description = "Password override for the initial admin user"
   default     = ""
 }
+
+variable "rancher_version" {
+  description = "Override for the installed Rancher version."
+  default     = ""
+}
