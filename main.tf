@@ -43,7 +43,9 @@ resource "aws_instance" "this" {
   )
 
   provisioner "remote-exec" {
-    inline = ["echo 'sshd is running'"]
+    inline = [
+      "cloud-init status --wait"
+    ]
 
     connection {
       host         = coalesce(self.public_ip, self.private_ip)
