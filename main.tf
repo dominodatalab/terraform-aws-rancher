@@ -44,7 +44,6 @@ resource "aws_instance" "this" {
 
   provisioner "remote-exec" {
     inline = [
-      "echo 'sshd is running'",
       "cloud-init status --wait"
     ]
 
