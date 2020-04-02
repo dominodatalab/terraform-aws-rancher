@@ -95,6 +95,16 @@ variable "os_disk_delete_on_termination" {
   default     = true
 }
 
+variable "os_disk_encrypted" {
+  description = "Encrypt root EBS volume"
+  default     = true
+}
+
+variable "os_disk_kms_key_id" {
+  description = "Optional encryption key for root EBS volume"
+  default     = ""
+}
+
 variable "ebs_optimized" {
   description = "Attach NICs dedicated to EBS volume network traffic"
   default     = true
