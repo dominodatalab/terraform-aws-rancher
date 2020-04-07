@@ -44,6 +44,8 @@ resource "aws_instance" "this" {
     },
   )
 
+  volume_tags = var.tags
+
   provisioner "remote-exec" {
     inline = [
       "cloud-init status --wait"
@@ -100,8 +102,6 @@ resource "aws_elb" "this" {
       "Terraform" = "true"
     },
   )
-
-  volume_tags = var.tags
 }
 
 #------------------------------------------------------------------------------
