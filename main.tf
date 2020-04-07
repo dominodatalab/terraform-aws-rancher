@@ -32,6 +32,8 @@ resource "aws_instance" "this" {
     volume_size           = var.os_disk_size
     volume_type           = var.os_disk_type
     delete_on_termination = var.os_disk_delete_on_termination
+    encrypted             = var.os_disk_encrypted
+    kms_key_id            = var.os_disk_kms_key_id
   }
 
   tags = merge(
