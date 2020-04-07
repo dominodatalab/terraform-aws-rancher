@@ -25,7 +25,7 @@ resource "aws_instance" "this" {
   ]
 
   lifecycle {
-    ignore_changes = [ami]
+    ignore_changes = [ami, root_block_device]
   }
 
   root_block_device {
