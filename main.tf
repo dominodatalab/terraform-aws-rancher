@@ -25,7 +25,7 @@ resource "aws_instance" "this" {
   ]
 
   lifecycle {
-    ignore_changes = [ami]
+    ignore_changes = [ami, root_block_device]
   }
 
   root_block_device {
@@ -43,6 +43,8 @@ resource "aws_instance" "this" {
       "Terraform" = "true"
     },
   )
+
+  volume_tags = var.tags
 
   provisioner "remote-exec" {
     inline = [
