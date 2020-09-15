@@ -10,7 +10,7 @@ _Note:_ public IP support is currently unsupported and deprecated.
 
 ```hcl
 module "rancher" {
-  source   = "github.com/cerebrotech/terraform-aws-rancher"
+  source   = "github.com/dominodatalab/terraform-aws-rancher"
 
   vpc_id         = "vpc-id"
   lb_cidr_blocks = ["0.0.0.0/0"]
@@ -26,7 +26,7 @@ module "rancher" {
 
 ```hcl
 module "rancher" {
-  source   = "github.com/cerebrotech/terraform-aws-rancher"
+  source   = "github.com/dominodatalab/terraform-aws-rancher"
 
   vpc_id         = "vpc-id"
   lb_cidr_blocks = ["0.0.0.0/0"]
@@ -46,7 +46,7 @@ module "rancher" {
 
 ```hcl
 module "rancher" {
-  source   = "github.com/cerebrotech/terraform-aws-rancher"
+  source   = "github.com/dominodatalab/terraform-aws-rancher"
 
   vpc_id             = "vpc-id"
   internal_lb        = true
