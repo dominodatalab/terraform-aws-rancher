@@ -369,4 +369,10 @@ module "ranchhand" {
   ssh_proxy_host = var.ssh_proxy_host
 
   admin_password = var.admin_password
+
+  helm_v3_registry_host = var.helm_v3_registry_host
+  helm_v3_registry_user = var.helm_v3_registry_user
+  helm_v3_registry_password = var.helm_v3_registry_password
+
+  newrelic_licensekey = var.newrelic_licensekey
 }
