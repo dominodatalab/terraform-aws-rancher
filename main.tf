@@ -353,7 +353,7 @@ resource "aws_security_group_rule" "provisioner_secgrp_ingress_443" {
 # Provisioner
 #------------------------------------------------------------------------------
 module "ranchhand" {
-  source = "github.com/dominodatalab/ranchhand?ref=v0.5.0"
+  source = "github.com/dominodatalab/ranchhand?ref=v0.6.0"
 
   node_ips = aws_instance.this.*.private_ip
 
@@ -369,4 +369,10 @@ module "ranchhand" {
   ssh_proxy_host = var.ssh_proxy_host
 
   admin_password = var.admin_password
+
+  helm_v3_registry_host     = var.helm_v3_registry_host
+  helm_v3_registry_user     = var.helm_v3_registry_user
+  helm_v3_registry_password = var.helm_v3_registry_password
+
+  newrelic_licensekey = var.newrelic_licensekey
 }

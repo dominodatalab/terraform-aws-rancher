@@ -172,3 +172,19 @@ variable "rancher_version" {
   description = "Override for the installed Rancher version."
   default     = ""
 }
+
+variable "helm_v3_registry_host" {
+  default = ""
+}
+
+variable "helm_v3_registry_user" {
+  default = ""
+}
+
+variable "helm_v3_registry_password" {
+  default = ""
+}
+
+variable "newrelic_licensekey" {
+  default = ""
+}
