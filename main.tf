@@ -19,6 +19,12 @@ resource "aws_instance" "this" {
   subnet_id               = element(var.subnet_ids, count.index % length(var.subnet_ids))
   disable_api_termination = var.enable_deletion_protection
 
+  # metadata_options {
+  #   http_endpoint               = "enabled"
+  #   http_put_response_hop_limit = 1
+  #   http_tokens                 = "required"
+  # }
+
   vpc_security_group_ids = [
     aws_security_group.instances.id,
     aws_security_group.provisioner.id,
@@ -353,7 +359,7 @@ resource "aws_security_group_rule" "provisioner_secgrp_ingress_443" {
 # Provisioner
 #------------------------------------------------------------------------------
 module "ranchhand" {
-  source = "github.com/dominodatalab/ranchhand?ref=v0.7.0"
+  source = "github.com/dominodatalab/ranchhand?ref=steved%2Fretries"
 
   node_ips = aws_instance.this.*.private_ip
 
