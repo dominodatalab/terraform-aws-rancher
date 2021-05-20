@@ -188,3 +188,7 @@ variable "helm_v3_registry_password" {
 variable "newrelic_licensekey" {
   default = ""
 }
+
+variable "require_imdsv2" {
+  description = "Require instance metadata service v2"
+}

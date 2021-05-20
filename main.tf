@@ -36,6 +36,12 @@ resource "aws_instance" "this" {
     kms_key_id            = var.os_disk_kms_key_id
   }
 
+  metadata_options {
+    http_endpoint               = "enabled"
+    http_tokens                 = var.require_imdsv2 ? "required" : "optional"
+    http_put_response_hop_limit = 2
+  }
+
   tags = merge(
     var.tags,
     {
