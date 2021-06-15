@@ -359,7 +359,7 @@ resource "aws_security_group_rule" "provisioner_secgrp_ingress_443" {
 # Provisioner
 #------------------------------------------------------------------------------
 module "ranchhand" {
-  source = "github.com/dominodatalab/ranchhand?ref=v0.7.1"
+  source = "github.com/dominodatalab/ranchhand?ref=v0.7.2"
 
   node_ips = aws_instance.this.*.private_ip
 
