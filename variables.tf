@@ -87,7 +87,7 @@ variable "os_disk_size" {
 
 variable "os_disk_type" {
   description = "Root partition volume type for instances"
-  default     = "gp2"
+  default     = "gp3"
 }
 
 variable "os_disk_delete_on_termination" {
@@ -170,6 +170,11 @@ variable "admin_password" {
 
 variable "rancher_version" {
   description = "Override for the installed Rancher version."
+  default     = ""
+}
+
+variable "rancher_image_tag" {
+  description = "Override for the installed Rancher image tag."
   default     = ""
 }
 

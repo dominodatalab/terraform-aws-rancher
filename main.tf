@@ -368,6 +368,7 @@ module "ranchhand" {
   cert_ipaddresses = var.cert_ipaddresses
 
   rancher_version = var.rancher_version
+  rancher_image_tag = var.rancher_image_tag
 
   ssh_username   = var.ssh_username
   ssh_key_path   = var.ssh_key_path
