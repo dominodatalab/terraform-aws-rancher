@@ -359,7 +359,7 @@ resource "aws_security_group_rule" "provisioner_secgrp_ingress_443" {
 # Provisioner
 #------------------------------------------------------------------------------
 module "ranchhand" {
-  source = "github.com/dominodatalab/ranchhand?ref=v0.8.0"
+  source = "github.com/dominodatalab/ranchhand?ref=v0.8.1"
 
   node_ips = aws_instance.this.*.private_ip
 
@@ -367,7 +367,7 @@ module "ranchhand" {
   cert_dnsnames    = concat([aws_elb.this.dns_name], var.cert_dnsnames)
   cert_ipaddresses = var.cert_ipaddresses
 
-  rancher_version = var.rancher_version
+  rancher_version   = var.rancher_version
   rancher_image_tag = var.rancher_image_tag
 
   ssh_username   = var.ssh_username
