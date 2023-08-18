@@ -168,14 +168,28 @@ variable "admin_password" {
   default     = ""
 }
 
+# Update the rancher_* variables together
+# Please reference the Rancher support matrix before changing these values
+# https://www.suse.com/suse-rancher/support-matrix/all-supported-versions/
+# before changing these values
 variable "rancher_version" {
-  description = "Override for the installed Rancher version."
-  default     = ""
+  description = "Override for the installed Rancher version. Without the [v]"
+  default     = "2.7.5"
 }
 
 variable "rancher_image_tag" {
-  description = "Override for the installed Rancher image tag."
-  default     = ""
+  description = "Override for the installed Rancher image tag. With the [v]"
+  default     = "v2.7.5"
+}
+
+variable "rancher_kubectl_version" {
+  description = "Override for the kubectl version supported by RKE to install. With the [v]"
+  default     = "v1.26.7"
+}
+
+variable "rancher_rke_version" {
+  description = "Override for the installed RKE image tag. With the [v]"
+  default     = "v1.4.8"
 }
 
 variable "helm_v3_registry_host" {
