@@ -369,6 +369,8 @@ module "ranchhand" {
 
   rancher_version   = var.rancher_version
   rancher_image_tag = var.rancher_image_tag
+  rke_version       = var.rancher_rke_version
+  kubectl_version   = var.rancher_kubectl_version
 
   ssh_username   = var.ssh_username
   ssh_key_path   = var.ssh_key_path
