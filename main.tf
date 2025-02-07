@@ -1,3 +1,14 @@
+terraform {
+  required_version = ">= 1.3.0"
+
+  required_providers {
+    aws = {
+      source  = "hashicorp/aws"
+      version = ">= 4.0.0"
+    }
+  }
+}
+
 locals {
   lb_name                 = "${var.name}-lb-${var.internal_lb ? "int" : "ext"}"
   lb_secgrp_name          = "${var.name}-lb"
@@ -75,7 +86,7 @@ resource "aws_elb" "this" {
   name            = local.lb_name
   security_groups = [aws_security_group.loadbalancer.id]
   subnets         = var.lb_subnet_ids
-  instances       = aws_instance.this.*.id
+  instances       = aws_instance.this[*].id
   internal        = var.internal_lb
   idle_timeout    = 3600
 
@@ -242,7 +253,7 @@ resource "aws_security_group" "instances" {
     description = "Node intercommunication"
     from_port   = 0
     to_port     = 0
-    protocol    = "-1"
+    protocol    = -1
     self        = true
   }
 
@@ -250,7 +261,7 @@ resource "aws_security_group" "instances" {
     description = "Allow all outbound traffic"
     from_port   = 0
     to_port     = 0
-    protocol    = "-1"
+    protocol    = -1
     cidr_blocks = ["0.0.0.0/0"]
   }
 
@@ -359,9 +370,9 @@ resource "aws_security_group_rule" "provisioner_secgrp_ingress_443" {
 # Provisioner
 #------------------------------------------------------------------------------
 module "ranchhand" {
-  source = "github.com/dominodatalab/ranchhand?ref=v1.1.1"
+  source = "github.com/dominodatalab/ranchhand?ref=plat-9091-rancher"
 
-  node_ips = aws_instance.this.*.private_ip
+  node_ips = aws_instance.this[*].private_ip
 
   working_dir      = var.ranchhand_working_dir
   cert_dnsnames    = concat([aws_elb.this.dns_name], var.cert_dnsnames)
