@@ -9,35 +9,22 @@ terraform {
   }
 }
 
-locals {
-  lb_name                 = "${var.name}-lb-${var.internal_lb ? "int" : "ext"}"
-  lb_secgrp_name          = "${var.name}-lb"
-  instance_secgrp_name    = "${var.name}-instances"
-  provisioner_secgrp_name = "${var.name}-provisioner"
-}
-
-#------------------------------------------------------------------------------
-# EC2 instances
-#------------------------------------------------------------------------------
-resource "aws_instance" "this" {
-  count = var.instance_count
-
-  ami                     = var.ami
-  ebs_optimized           = var.ebs_optimized
-  instance_type           = var.instance_type
+# #------------------------------------------------------------------------------
+# # EC2 instances
+# #------------------------------------------------------------------------------
+resource "aws_instance" "rke2_server" {
+  count                   = var.server_count
+  ami                     = data.aws_ami.ubuntu.id
+  instance_type           = var.server_instance_type
   key_name                = var.ssh_key_name
   monitoring              = var.enable_detailed_monitoring
-  subnet_id               = element(var.subnet_ids, count.index % length(var.subnet_ids))
   disable_api_termination = var.enable_deletion_protection
+  subnet_id               = var.subnet_ids[count.index]
+  user_data               = data.cloudinit_config.rke2_server_userdata.rendered
 
   vpc_security_group_ids = [
-    aws_security_group.instances.id,
-    aws_security_group.provisioner.id,
+    aws_security_group.rke2_server.id
   ]
-
-  lifecycle {
-    ignore_changes = [ami, root_block_device]
-  }
 
   root_block_device {
     volume_size           = var.os_disk_size
@@ -47,352 +34,586 @@ resource "aws_instance" "this" {
     kms_key_id            = var.os_disk_kms_key_id
   }
 
+  lifecycle {
+    ignore_changes = [ami, root_block_device]
+  }
+
   metadata_options {
     http_endpoint               = "enabled"
-    http_tokens                 = var.require_imdsv2 ? "required" : "optional"
+    http_tokens                 = "required"
     http_put_response_hop_limit = 2
   }
 
   tags = merge(
-    var.tags,
+    local.tags,
     {
       "Name"      = "${var.name}-${count.index}"
       "Terraform" = "true"
+      "rke2-role" = count.index == 0 ? "server" : "agent"
     },
   )
 
-  volume_tags = var.tags
+  volume_tags = local.tags
 
-  provisioner "remote-exec" {
-    inline = [
-      "cloud-init status --wait"
-    ]
-
-    connection {
-      host         = coalesce(self.public_ip, self.private_ip)
-      type         = "ssh"
-      user         = var.ssh_username
-      private_key  = file(var.ssh_key_path)
-      bastion_host = var.ssh_proxy_host
-      bastion_user = var.ssh_proxy_user
-    }
-  }
 }
 
-#------------------------------------------------------------------------------
-# Load balancer
-#------------------------------------------------------------------------------
-resource "aws_elb" "this" {
-  name            = local.lb_name
-  security_groups = [aws_security_group.loadbalancer.id]
-  subnets         = var.lb_subnet_ids
-  instances       = aws_instance.this[*].id
-  internal        = var.internal_lb
-  idle_timeout    = 3600
 
+# #------------------------------------------------------------------------------
+# # Load balancer
+# #------------------------------------------------------------------------------
+resource "aws_elb" "rke2_server" {
+  name            = "rke2-server-lb"
+  internal        = true
+  subnets         = var.subnet_ids
+  security_groups = [aws_security_group.rke2_server.id, aws_security_group.rke2_agent.id]
+
+  # listener {
+  #   instance_port     = 443
+  #   instance_protocol = "TCP"
+  #   lb_port           = 443
+  #   lb_protocol       = "TCP"
+  # }
+
+  # listener {
+  #   instance_port     = 80
+  #   instance_protocol = "TCP"
+  #   lb_port           = 80
+  #   lb_protocol       = "TCP"
+  # }
+
+  # RKE2 API server listener
   listener {
-    instance_port     = 443
+    instance_port     = 6443
     instance_protocol = "TCP"
-    lb_port           = 443
+    lb_port           = 6443
     lb_protocol       = "TCP"
   }
 
+  # RKE2 supervisor port for HA
   listener {
-    instance_port     = 80
+    instance_port     = 9345
     instance_protocol = "TCP"
-    lb_port           = 80
+    lb_port           = 9345
+    lb_protocol       = "TCP"
+  }
+
+  # RKE2 kubelet port
+  listener {
+    instance_port     = 10250
+    instance_protocol = "TCP"
+    lb_port           = 10250
+    lb_protocol       = "TCP"
+  }
+
+  # RKE2 etcd port
+  listener {
+    instance_port     = 2379
+    instance_protocol = "TCP"
+    lb_port           = 2379
+    lb_protocol       = "TCP"
+  }
+  # RKE2 etcd port
+  listener {
+    instance_port     = 2380
+    instance_protocol = "TCP"
+    lb_port           = 2380
     lb_protocol       = "TCP"
   }
 
   health_check {
     healthy_threshold   = 3
     unhealthy_threshold = 3
-    target              = "HTTP:80/healthz"
+    target              = "HTTP:6443/healthz"
     interval            = 10
     timeout             = 6
   }
 
-  tags = merge(
-    var.tags,
-    {
-      "Name"      = local.lb_name
-      "Terraform" = "true"
-    },
-  )
+  tags = {
+    Name = "rke2-server-nlb"
+  }
 }
 
-#------------------------------------------------------------------------------
-# Security groups
-#------------------------------------------------------------------------------
-resource "aws_security_group" "loadbalancer" {
-  name        = local.lb_secgrp_name
-  description = "Grant access to Rancher ELB"
-  vpc_id      = var.vpc_id
+resource "aws_lb_target_group" "rke2_api" {
+  name     = "rke2-api-tg"
+  port     = 6443
+  protocol = "TCP"
+  vpc_id   = var.vpc_id
 
-  tags = merge(
-    var.tags,
-    {
-      "Name"      = local.lb_secgrp_name
-      "Terraform" = "true"
-    },
-  )
-}
-
-resource "aws_security_group_rule" "lb_rancher_ingress_443" {
-  type      = "ingress"
-  from_port = 443
-  to_port   = 443
-  protocol  = "tcp"
-
-  security_group_id        = aws_security_group.loadbalancer.id
-  source_security_group_id = aws_security_group.instances.id
-}
-
-resource "aws_security_group_rule" "lb_rancher_ingress_80" {
-  type      = "ingress"
-  from_port = 80
-  to_port   = 80
-  protocol  = "tcp"
-
-  security_group_id        = aws_security_group.loadbalancer.id
-  source_security_group_id = aws_security_group.instances.id
-}
-
-resource "aws_security_group_rule" "lb_cidr_ingress_443" {
-  count = length(var.lb_cidr_blocks)
-
-  type      = "ingress"
-  from_port = 443
-  to_port   = 443
-  protocol  = "tcp"
-
-  security_group_id = aws_security_group.loadbalancer.id
-  cidr_blocks       = var.lb_cidr_blocks
-}
-
-resource "aws_security_group_rule" "lb_secgrp_ingress_443" {
-  count = var.lb_security_groups_count
-
-  type      = "ingress"
-  from_port = 443
-  to_port   = 443
-  protocol  = "tcp"
-
-  security_group_id        = aws_security_group.loadbalancer.id
-  source_security_group_id = var.lb_security_groups[count.index]
-}
-
-resource "aws_security_group_rule" "lb_cidr_ingress_80" {
-  count = length(var.lb_cidr_blocks)
-
-  type      = "ingress"
-  from_port = 80
-  to_port   = 80
-  protocol  = "tcp"
-
-  security_group_id = aws_security_group.loadbalancer.id
-  cidr_blocks       = var.lb_cidr_blocks
-}
-
-resource "aws_security_group_rule" "lb_secgrp_ingress_80" {
-  count = var.lb_security_groups_count
-
-  type      = "ingress"
-  from_port = 80
-  to_port   = 80
-  protocol  = "tcp"
-
-  security_group_id        = aws_security_group.loadbalancer.id
-  source_security_group_id = var.lb_security_groups[count.index]
-}
-
-resource "aws_security_group_rule" "lb_egress_443" {
-  type        = "egress"
-  description = "Outgoing instance traffic"
-  from_port   = 443
-  to_port     = 443
-  protocol    = "tcp"
-
-  security_group_id        = aws_security_group.loadbalancer.id
-  source_security_group_id = aws_security_group.instances.id
-}
-
-resource "aws_security_group_rule" "lb_egress_80" {
-  type        = "egress"
-  description = "Outgoing instance traffic"
-  from_port   = 80
-  to_port     = 80
-  protocol    = "tcp"
-
-  security_group_id        = aws_security_group.loadbalancer.id
-  source_security_group_id = aws_security_group.instances.id
-}
-
-resource "aws_security_group" "instances" {
-  name        = local.instance_secgrp_name
-  description = "Govern access to Rancher server instances"
-  vpc_id      = var.vpc_id
-
-  ingress {
-    description     = "Incoming LB traffic"
-    from_port       = 443
-    to_port         = 443
-    protocol        = "tcp"
-    security_groups = [aws_security_group.loadbalancer.id]
+  health_check {
+    enabled             = true
+    healthy_threshold   = 2
+    unhealthy_threshold = 2
+    timeout             = 10
+    interval            = 30
+    port                = 6443
+    protocol            = "TCP"
   }
 
-  ingress {
-    description     = "Incoming LB traffic"
-    from_port       = 80
-    to_port         = 80
-    protocol        = "tcp"
-    security_groups = [aws_security_group.loadbalancer.id]
+  tags = local.tags
+}
+
+resource "aws_lb_target_group" "rke2_server" {
+  name     = "rke2-server-tg"
+  port     = 9345 # RKE2 uses 9345 (server), 6443 (API), 10250 (kubelet), 2379-2380 (etcd)
+  protocol = "TCP"
+  vpc_id   = var.vpc_id
+
+
+  health_check {
+    enabled             = true
+    healthy_threshold   = 2
+    unhealthy_threshold = 2
+    timeout             = 10
+    interval            = 30
+    port                = 9345
+    protocol            = "TCP"
   }
 
+  tags = local.tags
+}
+
+# #------------------------------------------------------------------------------
+# # Security groups
+# #------------------------------------------------------------------------------
+resource "aws_security_group" "rke2_server" {
+  name_prefix = "rke2-server-"
+  vpc_id      = local.vpc_id
+
+  # Kubernetes API
   ingress {
-    description = "Node intercommunication"
-    from_port   = 0
-    to_port     = 0
-    protocol    = -1
-    self        = true
+    from_port   = 6443
+    to_port     = 6443
+    protocol    = "tcp"
+    cidr_blocks = [local.vpc_cidrs]
+  }
+
+  # RKE2 server port
+  ingress {
+    from_port   = 9345
+    to_port     = 9345
+    protocol    = "tcp"
+    cidr_blocks = [local.vpc_cidrs]
+  }
+
+  # etcd peer communication
+  ingress {
+    from_port   = 2379
+    to_port     = 2380
+    protocol    = "tcp"
+    cidr_blocks = [local.vpc_cidrs]
+  }
+
+  # Canal CNI
+  ingress {
+    from_port   = 8472
+    to_port     = 8472
+    protocol    = "udp"
+    cidr_blocks = [local.vpc_cidrs]
+  }
+
+  # Kubelet
+  ingress {
+    from_port   = 10250
+    to_port     = 10250
+    protocol    = "tcp"
+    cidr_blocks = [local.vpc_cidrs]
+  }
+
+  # NodePort services
+  ingress {
+    from_port   = 30000
+    to_port     = 32767
+    protocol    = "tcp"
+    cidr_blocks = [local.vpc_cidrs]
   }
 
   egress {
-    description = "Allow all outbound traffic"
     from_port   = 0
     to_port     = 0
-    protocol    = -1
+    protocol    = "-1"
     cidr_blocks = ["0.0.0.0/0"]
   }
 
-  tags = merge(
-    var.tags,
-    {
-      "Name"      = local.instance_secgrp_name
-      "Terraform" = "true"
-    },
-  )
+  tags = local.tags
 }
 
-resource "aws_security_group" "provisioner" {
-  name        = local.provisioner_secgrp_name
-  description = "Provision Rancher instances"
+resource "aws_security_group" "rke2_agent" {
+  name_prefix = "rke2-agent-"
   vpc_id      = var.vpc_id
 
-  tags = merge(
-    var.tags,
-    {
-      "Name"      = local.provisioner_secgrp_name
-      "Terraform" = "true"
-    },
-  )
+  # Kubelet
+  ingress {
+    from_port   = 10250
+    to_port     = 10250
+    protocol    = "tcp"
+    cidr_blocks = [local.vpc_cidrs]
+  }
+
+  # Canal CNI
+  ingress {
+    from_port   = 8472
+    to_port     = 8472
+    protocol    = "udp"
+    cidr_blocks = [local.vpc_cidrs]
+  }
+
+  # NodePort services
+  ingress {
+    from_port   = 30000
+    to_port     = 32767
+    protocol    = "tcp"
+    cidr_blocks = [local.vpc_cidrs] #[var.allowed_cidrs]
+  }
+
+  egress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  tags = local.tags
 }
 
-resource "aws_security_group_rule" "provisioner_cidr_ingress_22" {
-  count = var.use_provisioner_secgrp ? 0 : 1
+# resource "aws_security_group" "loadbalancer" {
+#   name        = local.lb_secgrp_name
+#   description = "Grant access to Rancher ELB"
+#   vpc_id      = var.vpc_id
 
-  type        = "ingress"
-  description = "RKE SSH access"
-  from_port   = 22
-  to_port     = 22
-  protocol    = "tcp"
+#   tags = merge(
+#     local.tags,
+#     {
+#       "Name"      = local.lb_secgrp_name
+#       "Terraform" = "true"
+#     },
+#   )
+# }
 
-  security_group_id = aws_security_group.provisioner.id
-  cidr_blocks       = [var.provisioner_cidr_block]
-}
+# # Existing load balancer rules for Rancher (443, 80)
+# resource "aws_security_group_rule" "lb_rancher_ingress_443" {
+#   description = "ingress port 443 - loadbalancer ${aws_security_group.loadbalancer.id}"
+#   type      = "ingress"
+#   from_port = 443
+#   to_port   = 443
+#   protocol  = "tcp"
 
-resource "aws_security_group_rule" "provisioner_secgrp_ingress_22" {
-  count = var.use_provisioner_secgrp ? 1 : 0
+#   security_group_id        = aws_security_group.loadbalancer.id
+#   source_security_group_id = aws_security_group.instances.id
+# }
 
-  type        = "ingress"
-  description = "RKE SSH access"
-  from_port   = 22
-  to_port     = 22
-  protocol    = "tcp"
+# resource "aws_security_group_rule" "lb_rancher_ingress_80" {
+#   description = "ingress port 80 - loadbalancer ${aws_security_group.loadbalancer.id}"
+#   type      = "ingress"
+#   from_port = 80
+#   to_port   = 80
+#   protocol  = "tcp"
 
-  security_group_id        = aws_security_group.provisioner.id
-  source_security_group_id = var.provisioner_security_group
-}
+#   security_group_id        = aws_security_group.loadbalancer.id
+#   source_security_group_id = aws_security_group.instances.id
+# }
 
-resource "aws_security_group_rule" "provisioner_cidr_ingress_6443" {
-  count = var.use_provisioner_secgrp ? 0 : 1
+# # RKE2 API server ingress rules
+# resource "aws_security_group_rule" "lb_rke2_ingress_6443" {
+#   description = "ingress port 6443 - RKE2 API server"
+#   type      = "ingress"
+#   from_port = 6443
+#   to_port   = 6443
+#   protocol  = "tcp"
 
-  type        = "ingress"
-  description = "RKE K8s endpoint verification"
-  from_port   = 6443
-  to_port     = 6443
-  protocol    = "tcp"
+#   security_group_id        = aws_security_group.loadbalancer.id
+#   source_security_group_id = aws_security_group.instances.id
+# }
 
-  security_group_id = aws_security_group.provisioner.id
-  cidr_blocks       = [var.provisioner_cidr_block]
-}
+# # RKE2 supervisor port ingress rules
+# resource "aws_security_group_rule" "lb_rke2_ingress_9345" {
+#   description = "ingress port 9345 - RKE2 supervisor"
+#   type      = "ingress"
+#   from_port = 9345
+#   to_port   = 9345
+#   protocol  = "tcp"
 
-resource "aws_security_group_rule" "provisioner_secgrp_ingress_6443" {
-  count = var.use_provisioner_secgrp ? 1 : 0
+#   security_group_id        = aws_security_group.loadbalancer.id
+#   source_security_group_id = aws_security_group.instances.id
+# }
 
-  type        = "ingress"
-  description = "RKE K8s endpoint verification"
-  from_port   = 6443
-  to_port     = 6443
-  protocol    = "tcp"
+# resource "aws_security_group_rule" "lb_cidr_ingress_443" {
+#   count = length(var.lb_cidr_blocks)
+#   description = "ingress port 443 - ${var.lb_cidr_blocks[count.index]}"
 
-  security_group_id        = aws_security_group.provisioner.id
-  source_security_group_id = var.provisioner_security_group
-}
+#   type      = "ingress"
+#   from_port = 443
+#   to_port   = 443
+#   protocol  = "tcp"
 
-resource "aws_security_group_rule" "provisioner_cidr_ingress_443" {
-  count = var.use_provisioner_secgrp ? 0 : 1
+#   security_group_id = aws_security_group.loadbalancer.id
+#   cidr_blocks       = var.lb_cidr_blocks
+# }
 
-  type        = "ingress"
-  description = "Ranchhand cluster verification"
-  from_port   = 443
-  to_port     = 443
-  protocol    = "tcp"
+# resource "aws_security_group_rule" "lb_secgrp_ingress_443" {
+#   count = var.lb_security_groups_count
+#   description = "${var.lb_security_groups[count.index]} ingress port 443"
 
-  security_group_id = aws_security_group.provisioner.id
-  cidr_blocks       = [var.provisioner_cidr_block]
-}
+#   type      = "ingress"
+#   from_port = 443
+#   to_port   = 443
+#   protocol  = "tcp"
 
-resource "aws_security_group_rule" "provisioner_secgrp_ingress_443" {
-  count = var.use_provisioner_secgrp ? 1 : 0
+#   security_group_id        = aws_security_group.loadbalancer.id
+#   source_security_group_id = var.lb_security_groups[count.index]
+# }
 
-  type        = "ingress"
-  description = "Ranchhand cluster verification"
-  from_port   = 443
-  to_port     = 443
-  protocol    = "tcp"
+# resource "aws_security_group_rule" "lb_cidr_ingress_80" {
+#   count = length(var.lb_cidr_blocks)
+#   description = "ingress port 80 - ${var.lb_cidr_blocks[count.index]}"
 
-  security_group_id        = aws_security_group.provisioner.id
-  source_security_group_id = var.provisioner_security_group
-}
+#   type      = "ingress"
+#   from_port = 80
+#   to_port   = 80
+#   protocol  = "tcp"
 
-#------------------------------------------------------------------------------
-# Provisioner
-#------------------------------------------------------------------------------
-module "ranchhand" {
-  source = "github.com/dominodatalab/ranchhand?ref=v1.1.2"
+#   security_group_id = aws_security_group.loadbalancer.id
+#   cidr_blocks       = var.lb_cidr_blocks
+# }
 
-  node_ips = aws_instance.this[*].private_ip
+# resource "aws_security_group_rule" "lb_secgrp_ingress_80" {
+#   count = var.lb_security_groups_count
+#   description = "${var.lb_security_groups[count.index]} ingress port 80"
 
-  working_dir      = var.ranchhand_working_dir
-  cert_dnsnames    = concat([aws_elb.this.dns_name], var.cert_dnsnames)
-  cert_ipaddresses = var.cert_ipaddresses
+#   type      = "ingress"
+#   from_port = 80
+#   to_port   = 80
+#   protocol  = "tcp"
 
-  rancher_version   = var.rancher_version
-  rancher_image_tag = var.rancher_image_tag
-  rke_version       = var.rancher_rke_version
-  kubectl_version   = var.rancher_kubectl_version
+#   security_group_id        = aws_security_group.loadbalancer.id
+#   source_security_group_id = var.lb_security_groups[count.index]
+# }
 
-  ssh_username   = var.ssh_username
-  ssh_key_path   = var.ssh_key_path
-  ssh_proxy_user = var.ssh_proxy_user
-  ssh_proxy_host = var.ssh_proxy_host
+# # RKE2 API server CIDR ingress rules
+# resource "aws_security_group_rule" "lb_cidr_ingress_6443" {
+#   count = length(var.lb_cidr_blocks)
+#   description = "ingress port 6443 - RKE2 API - ${var.lb_cidr_blocks[count.index]}"
 
-  admin_password = var.admin_password
+#   type      = "ingress"
+#   from_port = 6443
+#   to_port   = 6443
+#   protocol  = "tcp"
 
-  helm_v3_registry_host     = var.helm_v3_registry_host
-  helm_v3_registry_user     = var.helm_v3_registry_user
-  helm_v3_registry_password = var.helm_v3_registry_password
+#   security_group_id = aws_security_group.loadbalancer.id
+#   cidr_blocks       = var.lb_cidr_blocks
+# }
 
-  newrelic_license_key = var.newrelic_license_key
-}
+# resource "aws_security_group_rule" "lb_secgrp_ingress_6443" {
+#   count = var.lb_security_groups_count
+#   description = "${var.lb_security_groups[count.index]} ingress port 6443 - RKE2 API"
+
+#   type      = "ingress"
+#   from_port = 6443
+#   to_port   = 6443
+#   protocol  = "tcp"
+
+#   security_group_id        = aws_security_group.loadbalancer.id
+#   source_security_group_id = var.lb_security_groups[count.index]
+# }
+
+# resource "aws_security_group_rule" "lb_egress_443" {
+#   type        = "egress"
+#   description = "Outgoing instance traffic"
+#   from_port   = 443
+#   to_port     = 443
+#   protocol    = "tcp"
+
+#   security_group_id        = aws_security_group.loadbalancer.id
+#   source_security_group_id = aws_security_group.instances.id
+# }
+
+# resource "aws_security_group_rule" "lb_egress_80" {
+#   type        = "egress"
+#   description = "Outgoing instance traffic"
+#   from_port   = 80
+#   to_port     = 80
+#   protocol    = "tcp"
+
+#   security_group_id        = aws_security_group.loadbalancer.id
+#   source_security_group_id = aws_security_group.instances.id
+# }
+
+# # RKE2 egress rules
+# resource "aws_security_group_rule" "lb_egress_6443" {
+#   type        = "egress"
+#   description = "Outgoing RKE2 API traffic"
+#   from_port   = 6443
+#   to_port     = 6443
+#   protocol    = "tcp"
+
+#   security_group_id        = aws_security_group.loadbalancer.id
+#   source_security_group_id = aws_security_group.instances.id
+# }
+
+# resource "aws_security_group_rule" "lb_egress_9345" {
+#   type        = "egress"
+#   description = "Outgoing RKE2 supervisor traffic"
+#   from_port   = 9345
+#   to_port     = 9345
+#   protocol    = "tcp"
+
+#   security_group_id        = aws_security_group.loadbalancer.id
+#   source_security_group_id = aws_security_group.instances.id
+# }
+
+# resource "aws_security_group" "instances" {
+#   name        = local.instance_secgrp_name
+#   description = "Govern access to Rancher server instances"
+#   vpc_id      = var.vpc_id
+
+#   ingress {
+#     description     = "Incoming LB traffic"
+#     from_port       = 443
+#     to_port         = 443
+#     protocol        = "tcp"
+#     security_groups = [aws_security_group.loadbalancer.id]
+#   }
+
+#   ingress {
+#     description     = "Incoming LB traffic"
+#     from_port       = 80
+#     to_port         = 80
+#     protocol        = "tcp"
+#     security_groups = [aws_security_group.loadbalancer.id]
+#   }
+
+#   # RKE2 API server
+#   ingress {
+#     description     = "RKE2 API server"
+#     from_port       = 6443
+#     to_port         = 6443
+#     protocol        = "tcp"
+#     security_groups = [aws_security_group.loadbalancer.id]
+#   }
+
+#   # RKE2 supervisor port for HA
+#   ingress {
+#     description     = "RKE2 supervisor port"
+#     from_port       = 9345
+#     to_port         = 9345
+#     protocol        = "tcp"
+#     security_groups = [aws_security_group.loadbalancer.id]
+#   }
+
+#   # RKE2 etcd client port
+#   ingress {
+#     description = "RKE2 etcd client"
+#     from_port   = 2379
+#     to_port     = 2379
+#     protocol    = "tcp"
+#     self        = true
+#   }
+
+#   # RKE2 etcd peer port
+#   ingress {
+#     description = "RKE2 etcd peer"
+#     from_port   = 2380
+#     to_port     = 2380
+#     protocol    = "tcp"
+#     self        = true
+#   }
+
+#   # RKE2 kubelet
+#   ingress {
+#     description = "RKE2 kubelet"
+#     from_port   = 10250
+#     to_port     = 10250
+#     protocol    = "tcp"
+#     self        = true
+#   }
+
+#   # RKE2 CNI (Flannel VXLAN)
+#   ingress {
+#     description = "RKE2 CNI VXLAN"
+#     from_port   = 8472
+#     to_port     = 8472
+#     protocol    = "udp"
+#     self        = true
+#   }
+
+#   # RKE2 metrics server
+#   ingress {
+#     description = "RKE2 metrics server"
+#     from_port   = 10254
+#     to_port     = 10254
+#     protocol    = "tcp"
+#     self        = true
+#   }
+
+#   # NodePort services
+#   ingress {
+#     description = "NodePort services"
+#     from_port   = 30000
+#     to_port     = 32767
+#     protocol    = "tcp"
+#     self        = true
+#   }
+
+#   ingress {
+#     description = "Node intercommunication"
+#     from_port   = 0
+#     to_port     = 0
+#     protocol    = -1
+#     self        = true
+#   }
+
+#   egress {
+#     description = "Allow all outbound traffic"
+#     from_port   = 0
+#     to_port     = 0
+#     protocol    = -1
+#     cidr_blocks = ["0.0.0.0/0"]
+#   }
+
+#   tags = merge(
+#     local.tags,
+#     {
+#       "Name"      = local.instance_secgrp_name
+#       "Terraform" = "true"
+#     },
+#   )
+# }
+
+
+# resource "aws_security_group_rule" "provisioner_cidr_ingress_22" {
+#   count = var.use_provisioner_secgrp ? 0 : 1
+
+#   type        = "ingress"
+#   description = "RKE2 SSH access"
+#   from_port   = 22
+#   to_port     = 22
+#   protocol    = "tcp"
+
+#   security_group_id = aws_security_group.provisioner.id
+#   cidr_blocks       = [var.provisioner_cidr_block]
+# }
+
+# resource "aws_security_group_rule" "provisioner_secgrp_ingress_22" {
+#   count = var.use_provisioner_secgrp ? 1 : 0
+
+#   type        = "ingress"
+#   description = "RKE2 SSH access"
+#   from_port   = 22
+#   to_port     = 22
+#   protocol    = "tcp"
+
+#   security_group_id        = aws_security_group.provisioner.id
+#   source_security_group_id = var.provisioner_security_group
+# }
+
+# resource "aws_security_group_rule" "provisioner_cidr_ingress_6443" {
+#   count = var.use_provisioner_secgrp ? 0 : 1
+
+#   type        = "ingress"
+#   description = "RKE2 K8s endpoint verification"
+#   from_port   = 6443
+#   to_port     = 6443
+#   protocol    = "tcp"
+
+#   security_group_id = aws_security_group.provisioner.id
+#   cidr_blocks       = [var.provisioner_cidr_block]
+# }

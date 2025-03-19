@@ -1,5 +1,7 @@
 # terraform-aws-rancher
 
+**Note:** This module provisions Rancher clusters using RKE2 and containerd (not RKE1 or Docker).
+
 Terraform module which creates an HA deployment of Rancher inside AWS using [RanchHand](https://github.com/dominodatalab/ranchhand).
 
 ## Usage
