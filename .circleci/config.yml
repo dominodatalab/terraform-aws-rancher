@@ -1,0 +1,55 @@
+# CircleCI 2.1 configuration file
+# Check https://circleci.com/docs/2.0/sample-config/ for more details
+#
+version: 2.1
+
+orbs:
+  terraform: circleci/terraform@3.6.0
+
+executors:
+  trivy:
+    docker:
+      - image: aquasec/trivy:0.60.0
+    environment:
+      ENV_FILE: /tmp/workspace/.env
+      WORKSPACE: /tmp/workspace
+
+jobs:
+  terraform_fmt:
+    description: Check terraform format
+    executor: terraform/default
+    working_directory: /tmp/workspace
+    steps:
+      - checkout
+      - terraform/init:
+          path: .
+      - terraform/validate:
+          path: .
+      - terraform/fmt:
+          path: .
+  scan:
+    executor: trivy
+    steps:
+      - checkout
+      - setup_remote_docker
+      - run:
+          name: Install trivy
+          command: |
+            apk add --update-cache --upgrade curl
+            curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sh -s -- -b /usr/local/bin
+      - run:
+          name: Scan filesystem
+          command: |
+            trivy fs --include-non-failures --misconfig-scanners terraform \
+            --exit-code 0 --no-progress \
+            --scanners vuln,secret,config --severity CRITICAL,HIGH,MEDIUM,LOW \
+            --output "trivy-results.json" --format json --ignore-unfixed .
+      - store_artifacts:
+          path: trivy-results.json
+          destination: trivy_output
+
+workflows:
+  Lint and Scan:
+    jobs:
+    - terraform_fmt
+    - scan

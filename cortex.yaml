@@ -1,0 +1,18 @@
+openapi: 3.0.1
+info:
+  title: terraform-aws-rancher
+  description: Terraform module to deploy Rancher on AWS
+  x-cortex-tag: terraform-aws-rancher
+  x-cortex-type: service
+  x-cortex-git:
+    github:
+      alias: cortex
+      repository: dominodatalab/terraform-aws-rancher
+  x-cortex-owners:
+    - name: eng-distributions
+      type: group
+      provider: OKTA
+      description: Updated by eng-devprod
+  x-cortex-circle-ci:
+    projects:
+      - projectSlug: github/dominodatalab/terraform-aws-rancher
